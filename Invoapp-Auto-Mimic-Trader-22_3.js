@@ -649,7 +649,12 @@ function extractWorstLossUsd() {
 // pattern as findTradesExceedingUsdThreshold() so both agree on card shape.
 function findWorstTradeCard() {
   const body = document.body.innerText || '';
-  const re = /\b([A-Z]{2,10})\s+\d+\s*[Xx]\s+(Long|Short)[\s\S]{0,220}?-\$([\d,]+(?:\.\d+)?)[\s\S]{0,120}?\((-?\d+(?:\.\d+)?)%\)/gi;
+  // FIX: same cross-card misattribution bug as findTradesExceedingUsdThreshold()
+  // — the lazy [\s\S]{0,220}? / {0,120}? gaps used to be able to cross into
+  // the NEXT trade card, so a profitable card sitting next to a deep-red
+  // card could get the red card's loss/pct wrongly attributed to it. The
+  // tempered greedy tokens below stop the match at the next card boundary.
+  const re = /\b([A-Z]{2,10})\s+\d+\s*[Xx]\s+(Long|Short)(?:(?!\b[A-Z]{2,10}\s+\d+\s*[Xx]\s*(?:Long|Short)\b)[\s\S]){0,220}?-\$([\d,]+(?:\.\d+)?)(?:(?!\b[A-Z]{2,10}\s+\d+\s*[Xx]\s*(?:Long|Short)\b)[\s\S]){0,120}?\((-?\d+(?:\.\d+)?)%\)/gi;
   let m, best = null;
   while ((m = re.exec(body)) !== null) {
     const usd = parseFloat(String(m[3]).replace(/,/g, ''));
@@ -1549,10 +1554,17 @@ function findTradesExceedingUsdThreshold(threshold) {
   const body = document.body.innerText || '';
   const results = [];
 
-  // Regex walks every trade card in the page body.
+// Regex walks every trade card in the page body.
   // Pattern: SYMBOL whitespace NXLong/Short ... -$LOSS
-  // [\s\S]{0,300}? — lazy match skips over the current price line
-  const re = /\b([A-Z]{2,10})\s+(\d+)\s*[Xx]\s*(Long|Short)[\s\S]{0,300}?-\$([\d,]+(?:\.\d+)?)/g;
+  // FIX: the lazy [\s\S]{0,300}? used to be UNBOUNDED across card
+  // boundaries — if the current card was profitable (+$, no "-$" of its
+  // own), it would keep scanning into the NEXT card and misattribute that
+  // card's loss to the wrong symbol, occasionally closing a profitable
+  // trade because some other open position elsewhere was deep red.
+  // The tempered greedy token below refuses to advance past the start of
+  // another "SYMBOL NxLong/Short" card, so a profitable card now correctly
+  // produces no match instead of borrowing a neighboring card's loss.
+  const re = /\b([A-Z]{2,10})\s+(\d+)\s*[Xx]\s*(Long|Short)(?:(?!\b[A-Z]{2,10}\s+\d+\s*[Xx]\s*(?:Long|Short)\b)[\s\S]){0,300}?-\$([\d,]+(?:\.\d+)?)/g;
   let m;
   while ((m = re.exec(body)) !== null) {
     const symbol    = m[1];
