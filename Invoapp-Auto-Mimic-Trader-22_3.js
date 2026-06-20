@@ -613,7 +613,13 @@ function inferCurrentSymbol() {
   const m = (document.body.innerText || '').match(/\b([A-Z]{2,10})\s+\d+\s*[Xx]\s+(Long|Short)\b/);
   return m ? m[1] : null;
 }
-
+620  function inferCurrentSymbol() {
+   621    const m = (document.body.innerText || '').match(/\b([A-Z]{2,10})\s+\d+\s*[Xx]\s+(Long|Short)\b/);
+   622    return m ? m[1] : null;
+   623  }
+   624
+        ← INSERT THE NEW symbolForCopyButton() FUNCTION HERE
+   625  function inferLeverageFromBody() {
 function inferLeverageFromBody() {
   const m = (document.body.innerText || '').match(/\b(\d+)\s*[Xx]\s*(Long|Short)\b/);
   return m ? parseInt(m[1], 10) : null;
@@ -1338,7 +1344,14 @@ function processSingleCopy(loop, maxLoops, groupEl, onDone) {
   if (loop >= maxLoops) { onDone(); return; }
   if (checkModals()) return;
 
-  const copies = findVisibleCopyButtons();
+  const copies = findVisibleCopyButtons().filter(el => {
+    const sym = symbolForCopyButton(el);
+    if (sym && !symbolAllowed(sym)) {
+      logAct('COPY_SKIP_BLACKLIST', `${sym} update blocked by filter rules — leaving un-Copied`);
+      return false;
+    }
+    return true;
+  });
   if (!copies.length) {
     const { copiedCount } = countGroupCopyState(groupEl);
     logAct('COPY_DONE', `No more Copy buttons at loop ${loop} — ${copiedCount} Copied confirmed`);
