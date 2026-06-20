@@ -613,13 +613,25 @@ function inferCurrentSymbol() {
   const m = (document.body.innerText || '').match(/\b([A-Z]{2,10})\s+\d+\s*[Xx]\s+(Long|Short)\b/);
   return m ? m[1] : null;
 }
-620  function inferCurrentSymbol() {
-   621    const m = (document.body.innerText || '').match(/\b([A-Z]{2,10})\s+\d+\s*[Xx]\s+(Long|Short)\b/);
-   622    return m ? m[1] : null;
-   623  }
-   624
-        ← INSERT THE NEW symbolForCopyButton() FUNCTION HERE
-   625  function inferLeverageFromBody() {
+function symbolForCopyButton(copyEl, windowPx = 300) {
+  if (!copyEl) return null;
+  const body = document.body.innerText || '';
+  const br = copyEl.getBoundingClientRect();
+  const re = /\b([A-Z]{2,10})\s+\d+\s*[Xx]\s*(Long|Short)\b/g;
+  let m, best = null, bestDist = Infinity;
+  while ((m = re.exec(body)) !== null) {
+    const sym = m[1];
+    const el = findContaining(sym);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.top > br.bottom + 20) continue; // row must be at/above the button
+    const dist = Math.abs(br.top - r.bottom);
+    if (dist > windowPx) continue;
+    if (dist < bestDist) { bestDist = dist; best = sym; }
+  }
+  return best;
+}
+
 function inferLeverageFromBody() {
   const m = (document.body.innerText || '').match(/\b(\d+)\s*[Xx]\s*(Long|Short)\b/);
   return m ? parseInt(m[1], 10) : null;
