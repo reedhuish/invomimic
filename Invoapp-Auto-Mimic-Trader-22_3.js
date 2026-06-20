@@ -411,8 +411,24 @@ function enableAcc() {
 }
 
 // ── ELEMENT HELPERS ────────────────────────────────────────────────────────
+// FIX: findContaining()/findByText() had no way to tell the script's own
+// injected UI (status badge, red emergency banner) apart from real page
+// content. showEmergencyBanner() writes the trade symbol directly into the
+// banner's text (e.g. "...Trade AERO loss..."), so a later
+// findContaining('AERO') call from findWorstTradeCard() could match the
+// banner itself instead of the actual trade card — causing
+// attemptEmergencyClose() to click its own banner, fail to find "Close
+// Position", unlock, and re-trigger the same emergency next scan forever.
+// This starved handleWalletTradeUpdates(), since scanWallet() never got
+// past the (never-resolving) emergency check. Excluding own-UI here fixes
+// every searcher at once, since they all funnel through visible().
+function isOwnUI(el) {
+  return !!el.closest?.('#am-badge, #am-emergency-banner');
+}
+
 function visible(el) {
   if (!el) return false;
+  if (isOwnUI(el)) return false;
   const r = el.getBoundingClientRect();
   return !!(r.width && r.height && r.bottom > 0 && r.right > 0);
 }
