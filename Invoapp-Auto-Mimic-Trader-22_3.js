@@ -613,6 +613,24 @@ function inferCurrentSymbol() {
   const m = (document.body.innerText || '').match(/\b([A-Z]{2,10})\s+\d+\s*[Xx]\s+(Long|Short)\b/);
   return m ? m[1] : null;
 }
+function symbolForCopyButton(copyEl, windowPx = 300) {
+  if (!copyEl) return null;
+  const body = document.body.innerText || '';
+  const br = copyEl.getBoundingClientRect();
+  const re = /\b([A-Z]{2,10})\s+\d+\s*[Xx]\s*(Long|Short)\b/g;
+  let m, best = null, bestDist = Infinity;
+  while ((m = re.exec(body)) !== null) {
+    const sym = m[1];
+    const el = findContaining(sym);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.top > br.bottom + 20) continue; // row must be at/above the button
+    const dist = Math.abs(br.top - r.bottom);
+    if (dist > windowPx) continue;
+    if (dist < bestDist) { bestDist = dist; best = sym; }
+  }
+  return best;
+}
 
 function inferLeverageFromBody() {
   const m = (document.body.innerText || '').match(/\b(\d+)\s*[Xx]\s*(Long|Short)\b/);
@@ -1338,7 +1356,14 @@ function processSingleCopy(loop, maxLoops, groupEl, onDone) {
   if (loop >= maxLoops) { onDone(); return; }
   if (checkModals()) return;
 
-  const copies = findVisibleCopyButtons();
+  const copies = findVisibleCopyButtons().filter(el => {
+    const sym = symbolForCopyButton(el);
+    if (sym && !symbolAllowed(sym)) {
+      logAct('COPY_SKIP_BLACKLIST', `${sym} update blocked by filter rules — leaving un-Copied`);
+      return false;
+    }
+    return true;
+  });
   if (!copies.length) {
     const { copiedCount } = countGroupCopyState(groupEl);
     logAct('COPY_DONE', `No more Copy buttons at loop ${loop} — ${copiedCount} Copied confirmed`);
